@@ -1,0 +1,121 @@
+# Build and run:
+#   docker build -t goran/ubuntu:1.0 -f Dockerfile.goran-ubuntu .
+#   docker run -d --cap-add sys_ptrace -p127.0.0.1:2222:22 --name goran_ubuntu goran/ubuntu:1.0
+#   ssh-keygen -f "$HOME/.ssh/known_hosts" -R "[localhost]:2222"
+#
+# stop:
+#   docker stop goran_ubuntu
+# 
+
+FROM ubuntu:21.04
+
+RUN DEBIAN_FRONTEND="noninteractive" apt-get update && apt-get -y install tzdata
+
+RUN apt-get update \
+  && apt-get install -y ssh \
+      build-essential \
+      sudo \
+      gcc \
+      g++ \
+      gdb \
+      clang \
+      cmake \
+      rsync \
+      tar \
+      python \
+      git \
+      libboost-all-dev \
+      libevent-dev \
+      libdouble-conversion-dev \
+      libgoogle-glog-dev \
+      libgflags-dev \
+      libiberty-dev \
+      liblz4-dev \
+      liblzma-dev \
+      libsnappy-dev \
+      make \
+      zlib1g-dev \
+      binutils-dev \
+      libjemalloc-dev \
+      libssl-dev \
+      pkg-config \
+      libunwind-dev \
+      libunwind8-dev \
+      libelf-dev \
+      libdwarf-dev \
+  && apt-get clean
+
+RUN mkdir /build_dir
+
+### libfmt (shared and static) ###
+WORKDIR /build_dir
+RUN git clone https://github.com/fmtlib/fmt.git
+RUN mkdir fmt/build_fmt_shared
+WORKDIR fmt/build_fmt_shared
+RUN cmake -DBUILD_SHARED_LIBS=ON ..
+RUN make -j$(nproc)
+RUN make install
+WORKDIR /build_dir
+RUN mkdir fmt/build_fmt_static
+WORKDIR fmt/build_fmt_static
+RUN cmake -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true  ..
+RUN make -j$(nproc)
+RUN make install
+
+### folly (shared and static) ###
+WORKDIR /build_dir
+RUN git clone https://github.com/facebook/folly.git
+RUN mkdir folly/build_folly_shared
+WORKDIR folly/build_folly_shared
+RUN cmake -DBUILD_SHARED_LIBS=ON ..
+RUN make -j$(nproc)
+RUN make install
+WORKDIR /build_dir
+RUN mkdir folly/build_folly_static
+WORKDIR folly/build_folly_static
+RUN cmake -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true ..
+RUN make -j$(nproc)
+RUN make install
+
+### liburing ###
+WORKDIR /build_dir
+RUN git clone https://github.com/axboe/liburing.git
+WORKDIR liburing
+RUN ./configure && make && make install
+
+### libunifex (shared and static) ###
+WORKDIR /build_dir
+RUN git clone https://github.com/facebookexperimental/libunifex.git
+RUN mkdir libunifex/build_unifex_shared
+WORKDIR libunifex/build_unifex_shared
+RUN cmake -DCMAKE_CXX_FLAGS:STRING=-fcoroutines-ts -DCMAKE_CXX_STANDARD:STRING=20 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/clang++ -DCMAKE_C_COMPILER:PATH=/usr/bin/clang -DBUILD_SHARED_LIBS=ON ..
+RUN make
+RUN cp -R include/unifex /usr/local/include/
+RUN cp source/libunifex.so /usr/local/lib/
+WORKDIR /build_dir
+RUN mkdir libunifex/build_unifex_static
+WORKDIR libunifex/build_unifex_static
+RUN cmake -DCMAKE_CXX_FLAGS:STRING=-fcoroutines-ts -DCMAKE_CXX_STANDARD:STRING=20 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/clang++ -DCMAKE_C_COMPILER:PATH=/usr/bin/clang -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true ..
+RUN make
+RUN cp source/libunifex.a /usr/local/lib/
+
+
+WORKDIR /
+RUN rm -rf /build_dir
+
+RUN ( \
+    echo 'LogLevel DEBUG2'; \
+    echo 'PermitRootLogin yes'; \
+    echo 'PasswordAuthentication yes'; \
+    echo 'Subsystem sftp /usr/lib/openssh/sftp-server'; \
+  ) > /etc/ssh/sshd_config_goran_ubuntu \
+  && mkdir /run/sshd
+
+RUN useradd -m goran \
+  && yes password | passwd goran
+
+RUN usermod -a -G sudo goran
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN usermod -s /bin/bash goran
+
+CMD ["/usr/sbin/sshd", "-D", "-e", "-f", "/etc/ssh/sshd_config_goran_ubuntu"]
