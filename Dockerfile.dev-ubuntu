@@ -24,6 +24,7 @@ RUN apt-get update \
       tar \
       python \
       git \
+      rustc \
       libboost-all-dev \
       libevent-dev \
       libdouble-conversion-dev \
