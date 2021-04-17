@@ -91,7 +91,7 @@ RUN mkdir libunifex/build_unifex_shared
 WORKDIR libunifex/build_unifex_shared
 RUN cmake -DCMAKE_CXX_FLAGS:STRING=-fcoroutines-ts -DCMAKE_CXX_STANDARD:STRING=20 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/clang++ -DCMAKE_C_COMPILER:PATH=/usr/bin/clang -DBUILD_SHARED_LIBS=ON ..
 RUN make
-RUN cp -R include/unifex /usr/local/include/
+RUN cp -R ../include/unifex /usr/local/include/
 RUN cp source/libunifex.so /usr/local/lib/
 WORKDIR /build_dir
 RUN mkdir libunifex/build_unifex_static
