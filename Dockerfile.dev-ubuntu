@@ -1,6 +1,6 @@
 # Build and run:
 #   docker build -t goran/ubuntu:1.0 -f Dockerfile.goran-ubuntu .
-#   docker run -d --cap-add sys_ptrace -p127.0.0.1:2222:22 --name goran_ubuntu goran/ubuntu:1.0
+#   docker run -d --cap-add sys_ptrace -p127.0.0.1:2222:22 -v ~/Dev:/src --name goran-ubuntu goran-ubuntu:1.0
 #   ssh-keygen -f "$HOME/.ssh/known_hosts" -R "[localhost]:2222"
 #
 # stop:
@@ -22,7 +22,9 @@ RUN apt-get update \
       cmake \
       rsync \
       tar \
+      mc \
       python \
+      python3-pip \
       git \
       rustc \
       libboost-all-dev \
@@ -92,6 +94,7 @@ WORKDIR libunifex/build_unifex_shared
 RUN cmake -DCMAKE_CXX_FLAGS:STRING=-fcoroutines-ts -DCMAKE_CXX_STANDARD:STRING=20 -DCMAKE_CXX_COMPILER:PATH=/usr/bin/clang++ -DCMAKE_C_COMPILER:PATH=/usr/bin/clang -DBUILD_SHARED_LIBS=ON ..
 RUN make
 RUN cp -R ../include/unifex /usr/local/include/
+RUN cp -R include/unifex /usr/local/include/
 RUN cp source/libunifex.so /usr/local/lib/
 WORKDIR /build_dir
 RUN mkdir libunifex/build_unifex_static
@@ -100,9 +103,11 @@ RUN cmake -DCMAKE_CXX_FLAGS:STRING=-fcoroutines-ts -DCMAKE_CXX_STANDARD:STRING=2
 RUN make
 RUN cp source/libunifex.a /usr/local/lib/
 
-
+### remove temporary build directory ###
 WORKDIR /
 RUN rm -rf /build_dir
+
+RUN pip3 install conan
 
 RUN ( \
     echo 'LogLevel DEBUG2'; \
@@ -119,4 +124,10 @@ RUN usermod -a -G sudo goran
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN usermod -s /bin/bash goran
 
+### create default conan profile under user 'goran' ###
+USER goran
+RUN conan profile new default --detect
+RUN conan profile update settings.compiler.libcxx=libstdc++11 default
+
+USER root
 CMD ["/usr/sbin/sshd", "-D", "-e", "-f", "/etc/ssh/sshd_config_goran_ubuntu"]
