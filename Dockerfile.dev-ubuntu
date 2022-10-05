@@ -7,7 +7,7 @@
 #   docker stop goran_ubuntu
 # 
 
-FROM ubuntu:21.04
+FROM ubuntu:22.04
 
 RUN DEBIAN_FRONTEND="noninteractive" apt-get update && apt-get -y install tzdata
 
@@ -23,7 +23,7 @@ RUN apt-get update \
       rsync \
       tar \
       mc \
-      python \
+      python3 \
       python3-pip \
       git \
       rustc \
@@ -68,6 +68,9 @@ RUN make install
 ### folly (shared and static) ###
 WORKDIR /build_dir
 RUN git clone https://github.com/facebook/folly.git
+WORKDIR /build_dir/folly
+RUN git checkout v2022.07.11.00
+WORKDIR /build_dir
 RUN mkdir folly/build_folly_shared
 WORKDIR folly/build_folly_shared
 RUN cmake -DBUILD_SHARED_LIBS=ON ..
